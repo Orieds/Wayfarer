@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayfarer — Free Trip Planner</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--bg:#f6efdf;--card:#fffaf0;--ink:#3b3024;--mute:#85755d;--line:#e2d7bd;--acc:#b5532f;--grn:#4f6b45}
+@media(prefers-color-scheme:dark){:root{--bg:#241e16;--card:#2f271d;--ink:#efe3c6;--mute:#a8966f;--line:#4a3e2c;--acc:#e08a63;--grn:#9db487}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 'DM Sans',system-ui,sans-serif}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;margin:0}
+.app{display:grid;grid-template-columns:460px 1fr;height:100vh}
+@media(max-width:860px){.app{grid-template-columns:1fr;height:auto}#map{height:44vh;position:sticky;top:0;z-index:500;order:-1}.side{height:auto!important}}
+.side{overflow:auto;height:100vh;padding:18px}
+#map{height:100%;background:#e6dfca}
+.top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px}.top h1{font-size:1.5rem;margin-right:auto}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:8px 10px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:9px;font:inherit}
+textarea{resize:vertical}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.r3{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px}.row{display:flex;gap:6px}
+button{font:inherit;cursor:pointer}.sm{padding:6px 11px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;white-space:nowrap}
+.go{width:100%;padding:13px;border:0;border-radius:11px;background:var(--acc);color:#fff;font-weight:700;font-size:1rem;margin-top:14px}.go:disabled{opacity:.6}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{padding:5px 11px;border:1px solid var(--line);border-radius:99px;cursor:pointer;font-size:.82rem;background:var(--bg);user-select:none}.chip.on{background:var(--ink);color:var(--bg)}
+.hint{font-size:.78rem;color:var(--mute)}.warn{color:var(--acc)}
+.money{font:800 1.7rem Fraunces,serif}
+.bar{height:8px;border-radius:5px;background:var(--line);overflow:hidden;display:flex;margin:8px 0}.bar i{display:block}
+.lg{display:flex;flex-wrap:wrap;gap:3px 12px;font-size:.78rem;color:var(--mute)}.lg b{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
+.day h3{font-size:1.05rem;margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.it{display:grid;grid-template-columns:66px 1fr 84px;gap:4px 8px;padding:8px;border-radius:10px;border:1px solid transparent}.it:hover,.it.sel{background:var(--card);border-color:var(--line)}
+.it input,.it textarea{padding:4px 6px;font-size:.88rem;border-color:transparent;background:transparent}.it input:hover,.it textarea:hover,.it input:focus,.it textarea:focus{border-color:var(--line);background:var(--bg)}
+.it .nm{font-weight:700}.it .nt{grid-column:2/4;font-size:.82rem;color:var(--mute)}.it .ac{grid-column:2/4;display:flex;gap:4px;align-items:center;font-size:.76rem;color:var(--mute)}
+.ic{border:0;background:none;color:var(--mute);padding:2px 6px;border-radius:6px}.ic:hover{background:var(--line)}
+.star{color:var(--acc);font-weight:700}
+.pin{width:26px;height:26px;border-radius:50%;color:#fff;font:700 12px/26px 'DM Sans';text-align:center;border:2px solid #fff;box-shadow:0 1px 4px #0006}
+.lbl{font-weight:700;background:var(--card);border:1px solid var(--line);color:var(--ink)}
+.pp button{display:block;width:100%;margin:3px 0;padding:6px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#333}
+pre{white-space:pre-wrap;max-height:240px;overflow:auto;background:var(--bg);padding:8px;border-radius:8px;font-size:.72rem}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+<div class="top"><h1>Wayfarer</h1>
+<select id="cur" style="width:auto" title="Currency"></select>
+<button class="sm" id="share">🔗 Share</button><button class="sm" id="cfgbtn">⚙ Settings</button></div>
+<div class="box hide" id="cfgbox">
+<label>AI provider (free options)</label><select id="prov"></select>
+<div id="provf"><div class="r2"><div><label>API key</label><input id="key" type="password" placeholder="stored in this browser only"></div><div><label>Model</label><input id="model"></div></div>
+<label>Endpoint URL</label><input id="url"></div>
+<p class="hint">Keys never leave your browser except to the provider you choose. “No AI” uses the built-in planner (OpenStreetMap data only).</p>
+<label><input type="checkbox" id="dev" style="width:auto"> Developer mode (logs, raw responses, JSON editor)</label>
+<div id="devbox" class="hide"><div class="row"><button class="sm" id="test">Test AI connection</button><button class="sm" id="clog">Clear log</button></div>
+<label>Debug log</label><pre id="logs"></pre><label>Plan JSON (editable)</label><textarea id="json" rows="6"></textarea><button class="sm" id="applyjson" style="margin-top:6px">Apply JSON</button></div>
+</div>
+<div class="box" id="form">
+<label>From</label><div class="row"><input id="from" placeholder="e.g. Perth"><button class="sm" data-pick="from">📍</button></div>
+<label>To</label><div class="row"><input id="to" placeholder="e.g. Exmouth"><button class="sm" data-pick="to">📍</button></div>
+<div class="r2"><div><label>Depart</label><input type="date" id="d1"></div><div><label>Return</label><input type="date" id="d2"></div></div>
+<div class="r3"><div><label>Budget</label><input type="number" id="budget" value="3000" min="0" step="100"></div><div><label>People</label><input type="number" id="pax" value="2" min="1" max="20"></div><div><label>Round trip</label><select id="round"><option value="1">Yes</option><option value="0">One way</option></select></div></div>
+<div class="r2"><div><label>Transport</label><select id="mode"><option value="auto">Best fit</option><option value="drive">Road trip</option><option value="fly">Fly</option><option value="train">Train</option><option value="bus">Coach</option></select></div>
+<div><label>Style</label><select id="style"><option value="b">Budget</option><option value="m" selected>Mid-range</option><option value="l">Luxury</option></select></div></div>
+<div class="r2"><div><label>Pace</label><select id="pace"><option value="relaxed">Relaxed</option><option value="balanced" selected>Balanced</option><option value="packed">Packed</option></select></div><div><label>Needs</label><input id="needs" placeholder="vegan, kids…"></div></div>
+<label>Interests</label><div class="chips" id="chips"></div>
+<label>Notes for the planner</label><input id="notes" placeholder="e.g. swim with whale sharks">
+<button class="go" id="go">Plan my trip</button>
+<p class="hint" id="status">Tip: click anywhere on the map to set a start or destination.</p>
+</div>
+<div id="out"></div>
+</aside>
+<div id="map"></div>
+</div>
+<script>
+const $=id=>document.getElementById(id),esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const PROV={pollinations:{n:'Pollinations (free, no key)',url:'https://text.pollinations.ai/openai',model:'openai',key:0},
+groq:{n:'Groq (free key)',url:'https://api.groq.com/openai/v1/chat/completions',model:'llama-3.3-70b-versatile',key:1},
+openrouter:{n:'OpenRouter (free models)',url:'https://openrouter.ai/api/v1/chat/completions',model:'meta-llama/llama-3.3-70b-instruct:free',key:1},
+gemini:{n:'Google Gemini (free key)',url:'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',model:'gemini-2.0-flash',key:1},
+ollama:{n:'Local Ollama',url:'http://localhost:11434/v1/chat/completions',model:'llama3.1',key:0},
+custom:{n:'Custom OpenAI-compatible',url:'',model:'',key:1},none:{n:'No AI (built-in planner)'}};
+const INT=['food','beaches','nature','hiking','history','museums','wildlife','nightlife','markets','scenic','adventure','relaxing','family','photography'];
+const KW={nature:'park|nature_reserve|peak|waterfall|natural',hiking:'peak|nature_reserve|park',history:'historic|castle|monument|ruins|memorial|museum',museums:'museum|gallery',beaches:'beach',wildlife:'zoo|aquarium|nature_reserve',nightlife:'bar|pub',markets:'market',scenic:'viewpoint',adventure:'cave|peak|theme_park',family:'zoo|theme_park|aquarium|park',photography:'viewpoint|attraction',relaxing:'spa|hot_spring|beach|park'};
+const COL={meal:'#b5532f',sight:'#3d6a7d',nature:'#4f6b45',stay:'#8a7658',nightlife:'#a33a6a',transit:'#555',custom:'#7a5a9a'};
+const DEF={meal:{b:10,m:22,l:55},sight:{b:5,m:12,l:30},stay:{b:55,m:120,l:300},nightlife:{b:12,m:25,l:60},custom:{b:0,m:0,l:0}};
+let FX={USD:1,AUD:1.55,EUR:.93,GBP:.79,NZD:1.7,CAD:1.38,JPY:155,SGD:1.35,INR:84,CNY:7.2,THB:35,IDR:15800,ZAR:18,AED:3.67,CHF:.89,KRW:1380,MXN:18,BRL:5.4};
+let cfg={prov:'pollinations',key:'',model:'',url:'',dev:false,cur:'AUD'};try{Object.assign(cfg,JSON.parse(localStorage.getItem('wf_cfg')||'{}'))}catch(e){}
+let plan=null,logs=[],picked=new Set(['food','nature']),map,layers,temp,sel=null,hashT;
+const saveCfg=()=>{try{localStorage.setItem('wf_cfg',JSON.stringify(cfg))}catch(e){}};
+const log=(t,d)=>{logs.push('['+new Date().toLocaleTimeString()+'] '+t+(d?'
+'+(typeof d==='string'?d:JSON.stringify(d)):''));if(cfg.dev)$('logs').textContent=logs.join('
+
+');console.log(t,d)};
+const status=t=>$('status').textContent=t;
+const fx=()=>FX[cfg.cur]||1,fmt=u=>new Intl.NumberFormat(undefined,{style:'currency',currency:cfg.cur,maximumFractionDigits:0}).format((u||0)*fx());
+async function jf(url,opt={},ms=25000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(url,{...opt,signal:c.signal});if(!r.ok)throw new Error(r.status+' from '+url.split('/')[2]);return await r.json()}finally{clearTimeout(t)}}
+const hav=(a,b)=>{const R=Math.PI/180,x=Math.sin((b.lat-a.lat)*R/2)**2+Math.cos(a.lat*R)*Math.cos(b.lat*R)*Math.sin((b.lng-a.lng)*R/2)**2;return 12742*Math.asin(Math.sqrt(x))};
+
+/* ---------- setup UI ---------- */
+Object.keys(FX).forEach(c=>$('cur').add(new Option(c,c)));$('cur').value=cfg.cur;
+Object.entries(PROV).forEach(([k,v])=>$('prov').add(new Option(v.n,k)));
+INT.forEach(t=>{const s=document.createElement('span');s.className='chip'+(picked.has(t)?' on':'');s.textContent=t;s.onclick=()=>{picked.has(t)?picked.delete(t):picked.add(t);s.classList.toggle('on')};$('chips').appendChild(s)});
+const iso=d=>d.toISOString().slice(0,10),a0=new Date();a0.setDate(a0.getDate()+30);const b0=new Date(a0);b0.setDate(b0.getDate()+6);$('d1').value=iso(a0);$('d2').value=iso(b0);
+function cfgUI(){const p=PROV[cfg.prov];$('prov').value=cfg.prov;$('provf').classList.toggle('hide',cfg.prov==='none');$('key').value=cfg.key;$('model').value=cfg.model||p.model||'';$('url').value=cfg.url||p.url||'';$('key').placeholder=p.key?'required':'not needed';$('dev').checked=cfg.dev;$('devbox').classList.toggle('hide',!cfg.dev);$('logs').textContent=logs.join('
+
+')}
+$('cfgbtn').onclick=()=>$('cfgbox').classList.toggle('hide');
+$('prov').onchange=()=>{cfg.prov=$('prov').value;cfg.model='';cfg.url='';saveCfg();cfgUI()};
+['key','model','url'].forEach(k=>$(k).onchange=()=>{cfg[k]=$(k).value.trim();saveCfg()});
+$('dev').onchange=()=>{cfg.dev=$('dev').checked;saveCfg();cfgUI()};
+$('clog').onclick=()=>{logs=[];cfgUI()};
+$('cur').onchange=()=>{cfg.cur=$('cur').value;saveCfg();render()};
+$('test').onclick=async()=>{try{log('AI test',await askAI('Reply with the single word OK.'));alert('AI replied — see the log')}catch(e){log('AI test failed',String(e));alert('AI test failed: '+e.message)}};
+$('applyjson').onclick=()=>{try{plan=JSON.parse($('json').value);render();draw(true);saveHash()}catch(e){alert('Invalid JSON')}};
+jf('https://open.er-api.com/v6/latest/USD',{},8000).then(r=>{if(r.rates){FX={...FX,...r.rates};render()}}).catch(()=>log('Using built-in exchange rates'));
+
+/* ---------- map ---------- */
+map=L.map('map').setView([-25,134],4);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+layers=L.layerGroup().addTo(map);temp=L.layerGroup().addTo(map);
+map.on('click',e=>{const{lat,lng}=e.latlng;L.popup().setLatLng(e.latlng).setContent(`<div class="pp"><b>${lat.toFixed(3)}, ${lng.toFixed(3)}</b><button onclick="setPt('from',${lat},${lng})">Set as start</button><button onclick="setPt('to',${lat},${lng})">Set as destination</button></div>`).openOn(map)});
+window.setPt=async(k,lat,lng)=>{map.closePopup();const i=$(k);i.value=lat.toFixed(4)+', '+lng.toFixed(4);i.dataset.ll=lat+','+lng;
+  L.circleMarker([lat,lng],{radius:8,color:'#3b3024',fillColor:k==='from'?'#4f6b45':'#b5532f',fillOpacity:1}).bindTooltip(k==='from'?'Start':'End').addTo(temp);
+  try{const n=await rev(lat,lng,10,true);if(i.dataset.ll===lat+','+lng)i.value=n}catch(e){}};
+document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>alert('Click anywhere on the map, then choose “Set as start” or “Set as destination”.'));
+['from','to'].forEach(k=>$(k).addEventListener('input',()=>delete $(k).dataset.ll));
+
+/* ---------- data services ---------- */
+async function geo(q){const m=q.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);if(m)return{name:q,lat:+m[1],lng:+m[2]};
+  const r=await jf('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));if(!r[0])throw new Error('Could not find “'+q+'”');return{name:r[0].display_name.split(',').slice(0,2).join(',').trim(),lat:+r[0].lat,lng:+r[0].lon}}
+async function rev(lat,lng,z=10,full){const r=await jf(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=${z}&lat=${lat}&lon=${lng}`),a=r.address||{};const n=a.city||a.town||a.village||a.suburb||a.hamlet||a.county||(r.display_name||'Unknown').split(',')[0];return full?n+(a.state?', '+a.state:a.country?', '+a.country:''):n}
+async function osrm(a,b){try{const x=(await jf(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=simplified&geometries=geojson`)).routes[0];return{km:x.distance/1000,h:x.duration/3600,coords:x.geometry.coordinates.map(c=>[c[1],c[0]])}}catch(e){log('OSRM failed',String(e));return null}}
+function along(coords,f){const d=[0];for(let i=1;i<coords.length;i++)d[i]=d[i-1]+hav({lat:coords[i-1][0],lng:coords[i-1][1]},{lat:coords[i][0],lng:coords[i][1]});const t=d[d.length-1]*f;let i=1;while(i<d.length-1&&d[i]<t)i++;return{lat:coords[i][0],lng:coords[i][1]}}
+async function cands(loc,r){
+  const a=`(around:${r},${loc.lat},${loc.lng})`;
+  const q=`[out:json][timeout:25];nwr${a}["name"]["amenity"~"^(restaurant|cafe|pub|bar|fast_food)$"];out center tags 70;(nwr${a}["name"]["tourism"~"^(attraction|museum|gallery|viewpoint|zoo|theme_park|aquarium)$"];nwr${a}["name"]["historic"];nwr${a}["name"]["natural"~"^(beach|peak|cave_entrance|hot_spring|waterfall)$"];nwr${a}["name"]["leisure"~"^(park|nature_reserve|marina)$"];);out center tags 70;nwr${a}["name"]["tourism"~"^(hotel|motel|hostel|guest_house|apartment|camp_site|caravan_site)$"];out center tags 40;`;
+  let els=[];for(const ep of['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter']){try{els=(await jf(ep,{method:'POST',body:'data='+encodeURIComponent(q)},30000)).elements;break}catch(e){log('Overpass failed '+ep,String(e))}}
+  const out={meal:[],sight:[],stay:[]};
+  els.forEach(e=>{const t=e.tags||{},lat=e.lat??(e.center&&e.center.lat),lng=e.lon??(e.center&&e.center.lon);if(lat==null)return;
+    const kind=/^(bar|pub)$/.test(t.amenity)?'nightlife':t.amenity?'meal':/hotel|motel|hostel|guest_house|apartment|camp_site|caravan_site/.test(t.tourism||'')?'stay':'sight';
+    const txt=[t.amenity,t.tourism,t.historic,t.natural,t.leisure,t.cuisine,t.shop].filter(Boolean).join(' ').toLowerCase();
+    const score=(t.wikidata?3:0)+(t.wikipedia?2:0)+(t.website||t['contact:website']?1:0)+(t.opening_hours?1:0)+(t.stars?1:0)+(t.cuisine?.5:0)-(t.amenity==='fast_food'?1:0);
+    (out[kind==='nightlife'?'meal':kind]).push({name:t.name,kind,lat,lng,txt,score,hours:(t.opening_hours||'').slice(0,40),cui:t.cuisine||'',stars:t.stars||''})});
+  Object.keys(out).forEach(k=>{out[k].sort((x,y)=>y.score-x.score);const seen=new Set();out[k]=out[k].filter(c=>!seen.has(c.name)&&seen.add(c.name))});
+  return out}
+
+/* ---------- AI ---------- */
+async function askAI(prompt){
+  const p=PROV[cfg.prov],url=cfg.url||p.url,model=cfg.model||p.model;if(!url)throw new Error('No endpoint set');if(p.key&&!cfg.key)throw new Error('This provider needs an API key (Settings)');
+  const h={'Content-Type':'application/json'};if(cfg.key)h.Authorization='Bearer '+cfg.key;
+  log('AI request → '+url+' ['+model+']',prompt.slice(0,6000));const t0=Date.now();
+  const r=await fetch(url,{method:'POST',headers:h,body:JSON.stringify({model,temperature:.4,max_tokens:4096,messages:[{role:'system',content:'You are a precise travel-planning engine. Output only valid minified JSON when asked for JSON.'},{role:'user',content:prompt}]})});
+  const txt=await r.text();if(!r.ok)throw new Error('HTTP '+r.status+' '+txt.slice(0,120));
+  let out=txt;try{const jr=JSON.parse(txt);out=jr.choices?.[0]?.message?.content||txt}catch(e){}
+  out=out.replace(/```json\s*/gi,'').replace(/```\s*$/g,'').trim();
+  log('AI response ('+(Date.now()-t0)+' ms)',out);return out}
+const jparse=t=>{const clean=t.replace(/```json\s*/gi,'').replace(/```\s*$/g,'').trim();const s=clean.indexOf('{'),e=clean.lastIndexOf('}');if(s===-1||e===-1)throw new Error('No JSON object found in response');return JSON.parse(clean.slice(s,e+1))};
+
+/* ---------- planner ---------- */
+const hh=x=>{x=Math.max(0,Math.min(23.99,x));return String(Math.floor(x)).padStart(2,'0')+':'+String(Math.round((x%1)*60)%60).padStart(2,'0')};
+const cid=(i,k,j)=>i+k[0]+j;
+function mk(c,time,usd,rep,note,f){const type=c.kind;const per=usd!=null&&isFinite(usd)?+usd:DEF[type==='nightlife'?'nightlife':type][f.style];
+  const total=type==='stay'?per*Math.ceil(f.pax/2):per*f.pax;
+  return{time,type,name:c.name,lat:c.lat,lng:c.lng,usd:Math.round(total),rep:rep||null,note:note||[c.cui,c.hours&&'Hours: '+c.hours].filter(Boolean).join(' · ')}}
+function offlineDay(e,from,used,C,f){
+  const items=[],c=C[e.loc];if(!c)return items;const n={relaxed:2,balanced:3,packed:4}[f.pace];
+  const bonus=x=>[...f.interests].reduce((s,i)=>s+(KW[i]&&new RegExp(KW[i]).test(x.txt)?2:0),0);
+  const take=(list,k)=>list.filter(x=>!used.has(x.name)&&(k?x.kind===k:x.kind!=='nightlife')).map(x=>({x,s:x.score+bonus(x)})).sort((a,b)=>b.s-a.s).map(o=>o.x);
+  const start=Math.max(10,Math.ceil(from+1));
+  take(c.sight).slice(0,n).forEach((x,i)=>{used.add(x.name);items.push(mk(x,hh(start+i*2.5>12?start+i*2.5+1:start+i*2.5),null,null,'',f))});
+  const m=take(c.meal);[[12.5],[19]].forEach(([t],i)=>{const x=m[i];if(x){used.add(x.name);items.push(mk(x,hh(t),null,null,'',f))}});
+  if(f.interests.has('nightlife')){const x=take(c.meal,'nightlife')[0];if(x){used.add(x.name);items.push(mk(x,'21:00',null,null,'',f))}}
+  return items}
+async function generate(){
+  const f={from:$('from').value.trim(),to:$('to').value.trim(),pax:Math.max(1,+$('pax').value||1),style:$('style').value,pace:$('pace').value,mode:$('mode').value,round:$('round').value==='1',interests:picked,notes:$('notes').value,needs:$('needs').value};
+  if(!f.from||!f.to)return alert('Please enter a start and a destination.');
+  const d1=new Date($('d1').value+'T12:00'),n=Math.round((new Date($('d2').value+'T12:00')-d1)/864e5)+1;if(!(n>=1))return alert('Return date must be on or after departure.');
+  const warns=[];$('go').disabled=true;
+  try{
+    status('Finding your places…');
+    const A=$('from').dataset.ll?{name:f.from,lat:+$('from').dataset.ll.split(',')[0],lng:+$('from').dataset.ll.split(',')[1]}:await geo(f.from);await sleep(1000);
+    const B=$('to').dataset.ll?{name:f.to,lat:+$('to').dataset.ll.split(',')[0],lng:+$('to').dataset.ll.split(',')[1]}:await geo(f.to);
+    status('Routing…');let R=f.mode==='fly'?null:await osrm(A,B),mode=f.mode;
+    if(mode==='auto')mode=R&&R.h<=10?'drive':'fly';if(mode!=='fly'&&!R){warns.push('No road route found — switched to flights.');mode='fly'}
+    const km0=hav(A,B);if(mode==='fly')R={km:km0*1.05,h:km0/800+3,coords:[[A.lat,A.lng],[B.lat,B.lng]]};
+    else R.h*=({drive:1,train:1.1,bus:1.25})[mode];
+    const perDay={relaxed:5,balanced:7,packed:9}[f.pace];let k=mode==='fly'?0:Math.max(0,Math.ceil(R.h/perDay)-1);
+    const cap=f.round?Math.floor((n-2)/2):n-2;if(k>cap){warns.push('This trip is short for the distance — drives will be longer than your pace suggests.');k=Math.max(0,cap)}k=Math.min(k,6);
+    const P=[A];for(let j=1;j<=k;j++){const w=along(R.coords,j/(k+1));status('Finding overnight stop '+j+'…');await sleep(1100);P.push({...w,name:await rev(w.lat,w.lng,10)})}P.push(B);
+    const last=P.length-1,leg=(i,j)=>{const fr=1/(k+1),km=R.km*fr,h=R.h*fr,veh=Math.ceil(f.pax/4);return{km:Math.round(km),h:+h.toFixed(1),usd:Math.round(mode==='drive'?km*.12*veh:mode==='train'?km*.14*f.pax:mode==='bus'?km*.07*f.pax:0)}};
+    const seq=[];
+    if(mode==='fly')for(let i=0;i<n;i++)seq.push({loc:last,fly:i===0?'out':i===n-1&&f.round?'back':null});
+    else{for(let j=1;j<=k+1;j++)seq.push({loc:j,leg:[j-1,j]});const E=n-(k+1)-(f.round?k+1:0);for(let i=0;i<E;i++)seq.push({loc:last});if(f.round)for(let r=1;r<=k+1&&seq.length<n;r++)seq.push({loc:k+1-r,leg:[k+2-r,k+1-r]})}
+    while(seq.length<n)seq.push({loc:last});seq.length=n;
+    const C={};for(const i of new Set(seq.map(s=>s.loc))){if(i===0)continue;status('Finding real restaurants & sights in '+P[i].name+'…');await sleep(1200);C[i]=await cands(P[i],i===last?9000:4000)}
+    const by={};
+    Object.keys(C).forEach(i=>{const big=+i===last,c=C[i];c.meal=c.meal.slice(0,big?20:12);c.sight=c.sight.slice(0,big?20:12);c.stay=c.stay.slice(0,6);
+      [['meal','m'],['sight','s'],['stay','h']].forEach(([k,p])=>c[k].forEach((x,j)=>{x.id=i+p+j;by[x.id]=x}))});
+    // day skeleton
+    const days=seq.map((e,d)=>{const dt=new Date(d1);dt.setDate(dt.getDate()+d);let from=9,items=[];
+      if(e.leg){const l=leg(e.leg[0],e.leg[1]);items.push({time:'08:00',type:'transit',name:({drive:'Drive',train:'Train',bus:'Coach'})[mode]+' '+P[e.leg[0]].name+' → '+P[e.leg[1]].name,note:l.km+' km · ~'+l.h+' h',usd:l.usd});from=8+l.h}
+      if(e.fly==='out'){const c=Math.round((60+.09*R.km)*f.pax);items.push({time:'08:00',type:'transit',name:'Fly '+A.name+' → '+B.name,note:'~'+km0.toFixed(0)+' km · estimate, check fares',usd:c});from=8+R.h+1.5}
+      return{date:iso(dt),title:e.loc===0?'Home again':P[e.loc].name,e,items,from,stay:e.loc!==0}});
+    days.forEach((d,i)=>{if(d.e.fly==='back'){d.back=true}});
+    // AI or offline
+    let ai=null;
+    if(cfg.prov!=='none'){status('Asking the AI to curate your itinerary…');
+      const cl=Object.keys(C).map(i=>`LOCATION ${i} = ${P[i].name}
+`+['meal','sight','stay'].map(k=>k.toUpperCase()+'S:
+'+C[i][k].map(x=>`${x.id}|${x.name}|${x.cui||x.txt.split(' ')[1]||x.txt.split(' ')[0]}|${x.hours}`).join('
+')).join('
+')).join('
+
+');
+      const sk=days.map((d,i)=>`Day ${i+1} ${d.date} (${new Date(d.date+'T12:00').toLocaleDateString('en',{weekday:'short'})}) at LOCATION ${d.e.loc}${d.e.loc===0?' (home, no activities)':''}; free from ${hh(d.from)}; needs: ${d.e.loc===0?'nothing':'lunch, dinner, '+({relaxed:2,balanced:3,packed:4})[f.pace]+' sights'+(d.stay&&i<n-1?', 1 stay':'')}`).join('
+');
+      const pr=`Curate a trip itinerary using ONLY the candidate ids below (real OpenStreetMap venues). Trip: ${f.pax} traveller(s), style ${f.style==='b'?'budget':f.style==='l'?'luxury':'mid-range'}, interests ${[...picked].join(', ')||'general'}, needs ${f.needs||'none'}, notes ${f.notes||'none'}. Prefer venues you know to be well-reviewed, check likely opening hours for the weekday, don't reuse ids, order stops sensibly, meals at 07:30-09:00 / 12:00-13:30 / 18:30-20:00. Costs in USD PER PERSON (stays: per room per night). "rep" = your best estimate of the typical review score 1-5, or null if you don't know the place.
+
+DAYS:
+${sk}
+
+${cl}
+
+Return ONLY JSON: {"days":[{"day":1,"title":"short theme","items":[{"id":"1m3","time":"12:30","cost":20,"rep":4.4,"note":"why it fits, max 90 chars"}]}],"tips":["..."],"verdict":"is the budget realistic?"}`;
+      try{ai=jparse(await askAI(pr))}catch(e){log('AI failed',String(e));warns.push('AI unavailable ('+e.message+') — used the built-in planner.')}}
+    const used=new Set();
+    days.forEach((d,i)=>{const ad=ai&&ai.days&&(ai.days.find(x=>+x.day===i+1));let its=[];
+      if(ad&&d.e.loc!==0){(ad.items||[]).forEach(x=>{const c=by[x.id];if(c&&String(c.id).startsWith(d.e.loc+''))its.push(mk(c,x.time||'12:00',x.cost,x.rep,x.note,f))});if(ad.title)d.title=ad.title}
+      if(!its.length&&d.e.loc!==0)its=offlineDay(d.e,d.from,used,C,f);
+      if(d.stay&&i<n-1&&d.e.loc!==0&&!its.some(x=>x.type==='stay')){const c=(C[d.e.loc].stay||[])[0];if(c)its.push(mk(c,'21:30',null,null,'',f))}
+      d.items.push(...its);
+      if(d.e.fly==='back'){d.items.push({time:'17:00',type:'transit',name:'Fly '+B.name+' → '+A.name,note:'estimate, check fares',usd:Math.round((60+.09*R.km)*f.pax)})}
+      if(d.e.loc===0&&d.e.leg)d.title='Home again';
+      d.items.sort((a,b)=>a.time.localeCompare(b.time));delete d.e;delete d.from;delete d.stay;delete d.back});
+    const fmod=Math.max(1,FX[$('cur').value]||1);
+    cfg.cur=$('cur').value;
+    plan={v:1,meta:{from:A.name,to:B.name,start:$('d1').value,end:$('d2').value,pax:f.pax,budgetUsd:Math.round((+$('budget').value||0)/(FX[cfg.cur]||1)),mode,verdict:(ai&&ai.verdict)||'',tips:(ai&&ai.tips)||[],warns,ai:!!ai},
+      stops:P.map(p=>({name:p.name,lat:+p.lat.toFixed(4),lng:+p.lng.toFixed(4)})),route:R.coords.filter((_,i)=>i%Math.ceil(R.coords.length/90)===0||i===R.coords.length-1).map(c=>[+c[0].toFixed(3),+c[1].toFixed(3)]),days};
+    status('Done — edit anything below, then use Share.');render();draw(true);saveHash();$('out').scrollIntoView({behavior:'smooth'})
+  }catch(e){log('Generate failed',String(e));status('Something went wrong: '+e.message)}
+  $('go').disabled=false}
+$('go').onclick=generate;
+
+/* ---------- render / edit ---------- */
+function render(){
+  if(!plan){$('out').innerHTML='';return}const m=plan.meta,tot={Transport:0,Stay:0,Food:0,Activities:0},col={Transport:'#3d6a7d',Stay:'#8a7658',Food:'#b5532f',Activities:'#4f6b45'};
+  plan.days.forEach(d=>d.items.forEach(i=>{tot[i.type==='transit'?'Transport':i.type==='stay'?'Stay':i.type==='meal'||i.type==='nightlife'?'Food':'Activities']+=+i.usd||0}));
+  const T=Object.values(tot).reduce((a,b)=>a+b,0),left=m.budgetUsd-T;let n=0;
+  $('json').value=JSON.stringify(plan);
+  $('out').innerHTML=`<div class="box"><h2>${esc(m.from)} → ${esc(m.to)}</h2><div class="hint">${esc(m.start)} to ${esc(m.end)} · ${m.pax} traveller${m.pax>1?'s':''} · ${esc(m.mode)}</div>
+  <div><span class="money">${fmt(T)}</span> <span class="hint">of <input type="number" id="bud" value="${Math.round(m.budgetUsd*fx())}" style="width:90px;display:inline;padding:2px 6px"> · <b style="color:var(--${left<0?'acc':'grn'})">${left>=0?fmt(left)+' spare':fmt(-left)+' over'}</b></span></div>
+  <div class="bar">${Object.keys(tot).map(k=>`<i style="width:${T?tot[k]/Math.max(T,m.budgetUsd)*100:0}%;background:${col[k]}"></i>`).join('')}</div>
+  <div class="lg">${Object.keys(tot).map(k=>`<span><b style="background:${col[k]}"></b>${k} ${fmt(tot[k])}</span>`).join('')}</div>
+  ${m.verdict?`<p class="hint">${esc(m.verdict)}</p>`:''}${(m.warns||[]).map(w=>`<p class="warn hint">⚠ ${esc(w)}</p>`).join('')}</div>
+  ${plan.days.map((d,di)=>`<div class="day"><h3>Day ${di+1} · ${esc(d.title)} <small class="hint">${esc(d.date)}</small></h3>${d.items.map((it,ii)=>{const num=it.type==='transit'?'':(++n)+'. ';return`<div class="it" id="it-${di}-${ii}"><input type="time" data-d="${di}" data-i="${ii}" data-f="time" value="${esc(it.time)}"><div><input class="nm" data-d="${di}" data-i="${ii}" data-f="name" value="${esc(num+''+it.name)}" ${it.type==='transit'?'':'data-num="'+num+'"'}>${it.rep?`<span class="star">★ ~${esc(it.rep)}</span> <span class="hint">AI est.</span>`:''}</div><input type="number" data-d="${di}" data-i="${ii}" data-f="cost" value="${Math.round((it.usd||0)*fx())}" title="Cost for the group">
+  <textarea class="nt" rows="1" data-d="${di}" data-i="${ii}" data-f="note">${esc(it.note)}</textarea><div class="ac"><button class="ic" data-a="up" data-d="${di}" data-i="${ii}">▲</button><button class="ic" data-a="dn" data-d="${di}" data-i="${ii}">▼</button><button class="ic" data-a="del" data-d="${di}" data-i="${ii}">✕</button><button class="ic" data-a="go" data-d="${di}" data-i="${ii}">📍 show</button></div></div>`}).join('')}<button class="sm" data-a="add" data-d="${di}">＋ Add a place</button></div>`).join('')}
+  ${(m.tips&&m.tips.length)?`<div class="box" style="margin-top:14px"><h3 style="font-size:1rem">Good to know</h3><ul>${m.tips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
+  <p class="hint">Places are real OpenStreetMap venues. ${m.ai?'Ratings and suggestions come from a free AI model’s general knowledge, not live reviews. ':''}Confirm hours and prices before booking. Anyone with this page’s link can open and edit their own copy.</p>`}
+$('out').addEventListener('change',e=>{const t=e.target;if(t.id==='bud'){plan.meta.budgetUsd=(+t.value||0)/fx();return render(),saveHash()}
+  if(t.dataset.f===undefined)return;const it=plan.days[+t.dataset.d].items[+t.dataset.i],f=t.dataset.f;
+  if(f==='cost')it.usd=(+t.value||0)/fx();else if(f==='name')it.name=t.value.replace(/^\d+\.\s*/,'');else it[f]=t.value;
+  if(f==='time')plan.days[+t.dataset.d].items.sort((a,b)=>a.time.localeCompare(b.time));render();draw();saveHash()});
+$('out').addEventListener('click',async e=>{const b=e.target.closest('[data-a]');if(!b)return;const d=+b.dataset.d,i=+b.dataset.i,a=b.dataset.a,its=plan.days[d].items;
+  if(a==='del'){its.splice(i,1)}else if(a==='up'&&i>0){[its[i-1].time,its[i].time]=[its[i].time,its[i-1].time];[its[i-1],its[i]]=[its[i],its[i-1]]}else if(a==='dn'&&i<its.length-1){[its[i+1].time,its[i].time]=[its[i].time,its[i+1].time];[its[i+1],its[i]]=[its[i],its[i+1]]}
+  else if(a==='go'){const it=its[i];if(it.lat){map.flyTo([it.lat,it.lng],15);sel=d+'-'+i}return}
+  else if(a==='add'){const q=prompt('Search for a place to add (name + town):');if(!q)return;try{const g=await geo(q);its.push({time:'15:00',type:'custom',name:g.name,lat:g.lat,lng:g.lng,usd:0,note:''});its.sort((x,y)=>x.time.localeCompare(y.time))}catch(err){return alert(err.message)}}
+  render();draw();saveHash()});
+function draw(fit){layers.clearLayers();if(!plan)return;const pts=[];
+  if(plan.route.length>1)L.polyline(plan.route,{color:'#b5532f',weight:4,opacity:.8,dashArray:plan.meta.mode==='fly'?'8 8':null}).addTo(layers);plan.route.forEach(p=>pts.push(p));
+  plan.stops.forEach(s=>L.circleMarker([s.lat,s.lng],{radius:7,color:'#b5532f',fillColor:'#fffaf0',fillOpacity:1,weight:3}).bindTooltip(s.name,{permanent:true,direction:'top',className:'lbl'}).addTo(layers));
+  let n=0;plan.days.forEach((d,di)=>d.items.forEach((it,ii)=>{if(it.type==='transit'||!it.lat)return;n++;pts.push([it.lat,it.lng]);
+    L.marker([it.lat,it.lng],{icon:L.divIcon({className:'',html:`<div class="pin" style="background:${COL[it.type]||COL.sight}">${n}</div>`,iconSize:[26,26]})}).bindPopup(`<b>${esc(it.name)}</b><br>${esc(it.time)}`).on('click',()=>{const el=document.getElementById(`it-${di}-${ii}`);el&&el.scrollIntoView({behavior:'smooth',block:'center'})}).addTo(layers)}));
+  if(fit&&pts.length)map.fitBounds(pts,{padding:[40,40]})}
+
+/* ---------- share (plan lives in the link; no server) ---------- */
+const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode(...u.subarray(i,i+8192));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
+const unb64=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+async function enc(o){const s=JSON.stringify(o);try{return'z'+b64(new Uint8Array(await new Response(new Blob([s]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer()))}catch(e){return'j'+b64(new TextEncoder().encode(s))}}
+async function dec(h){const u=unb64(h.slice(1));return JSON.parse(h[0]==='z'?await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text():new TextDecoder().decode(u))}
+function saveHash(){clearTimeout(hashT);hashT=setTimeout(async()=>{if(plan)history.replaceState(null,'','#p='+await enc(plan))},400)}
+$('share').onclick=async()=>{if(!plan)return alert('Plan a trip first.');history.replaceState(null,'','#p='+await enc(plan));try{await navigator.clipboard.writeText(location.href);alert('Link copied! Anyone who opens it gets this plan and can edit it. After editing, copy the (updated) link again to share your changes.')}catch(e){prompt('Copy this link:',location.href)}};
+async function boot(){cfgUI();if(location.hash.startsWith('#p=')){try{plan=await dec(location.hash.slice(3));cfg.cur=cfg.cur;render();draw(true);status('Shared plan loaded — you can edit it.')}catch(e){status('That share link could not be read.')}}}
+boot();
+</script>
+</body>
+</html>
